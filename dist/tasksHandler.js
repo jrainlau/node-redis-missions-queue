@@ -2,22 +2,25 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const utils_1 = require("./utils");
 const mqClient_1 = require("./mqClient");
-const getTasksLen = () => new Promise(resolve => mqClient_1.default.llen(utils_1.TASK_NAME, (err, reply) => resolve(Number(reply))));
-const popTask = () => new Promise(resolve => mqClient_1.default.blpop(utils_1.TASK_NAME, 1000, (err, reply) => resolve(reply[1])));
-const getBeginTime = () => new Promise(resolve => mqClient_1.default.get(`${utils_1.TASK_NAME}_BEGIN`, (err, reply) => resolve(Number(reply))));
+const Redlock = require("redlock");
+const redlock = new Redlock([mqClient_1.default], {
+    retryCount: 100,
+    retryDelay: 200,
+});
 async function tasksHandler() {
-    let tasksLen = await getTasksLen();
-    if (!tasksLen) {
-        console.log(`${utils_1.pm2tips} All tasks were received!`);
+    await utils_1.setBeginTime(redlock);
+    let curIndex = await utils_1.getCurIndex();
+    // all tasks were completed
+    if (curIndex === utils_1.TASK_AMOUNT) {
+        const beginTime = await utils_1.getRedisValue(`${utils_1.TASK_NAME}_BEGIN_TIME`);
+        const cost = new Date().getTime() - Number(beginTime);
+        console.log(`${utils_1.pm2tips} All tasks were completed! Time cost: ${cost}ms.`);
         return;
     }
-    if (tasksLen === utils_1.TASK_AMOUNT) {
-        mqClient_1.default.set(`${utils_1.TASK_NAME}_BEGIN`, `${new Date().getTime()}`);
-    }
-    const task = await popTask();
+    const task = await utils_1.popTask();
     // handle task
     function handleTask(task) {
-        return new Promise(resolve => {
+        return new Promise((resolve) => {
             setTimeout(async () => {
                 console.log(`${utils_1.pm2tips} Handling task: ${task}...`);
                 resolve();
@@ -25,11 +28,14 @@ async function tasksHandler() {
         });
     }
     await handleTask(task);
-    tasksLen = await getTasksLen();
-    if (!tasksLen) {
-        const beginTime = await getBeginTime();
-        const cost = new Date().getTime() - beginTime;
-        console.log(`${utils_1.pm2tips} All tasks were completed! Time cost: ${cost}ms.`);
+    try {
+        const lock = await redlock.lock(`lock:${utils_1.TASK_NAME}_CUR_INDEX`, 1000);
+        curIndex = await utils_1.getCurIndex();
+        await utils_1.setCurIndex(curIndex + 1);
+        await lock.unlock().catch((e) => e);
+    }
+    catch (e) {
+        console.log(e);
     }
     // recursion
     await tasksHandler();

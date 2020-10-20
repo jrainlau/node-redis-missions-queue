@@ -8,7 +8,7 @@
     "stop:redis": "docker container kill redis-local && docker container rm redis-local",
     "createTasks": "node ./dist/createTasks.js",
     "start:pm2": "pm2 start ./dist/index.js -i 4 --watch && pm2 logs",
-    "stop:pm2": "pm2 delete all && pm2 flush",
+    "stop:pm2": "pm2 delete all & pm2 flush",
     "dev": "tsc --watch"
   },
   "repository": {

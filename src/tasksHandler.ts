@@ -1,25 +1,38 @@
-import { TASK_NAME, TASK_AMOUNT, pm2tips } from './utils'
+import {
+  TASK_NAME,
+  TASK_AMOUNT,
+  pm2tips,
+  popTask,
+  getCurIndex,
+  setCurIndex,
+  setBeginTime,
+  getRedisValue
+} from './utils'
 import client from './mqClient'
+import * as Redlock from 'redlock'
 
-const getTasksLen = (): Promise<number> => new Promise(resolve => client.llen(TASK_NAME, (err, reply) => resolve(Number(reply))))
-const popTask = (): Promise<string> => new Promise(resolve => client.blpop(TASK_NAME, 1000, (err, reply) => resolve(reply[1])))
-const getBeginTime = (): Promise<number> => new Promise(resolve => client.get(`${TASK_NAME}_BEGIN`, (err, reply) => resolve(Number(reply))))
+const redlock = new Redlock([client], {
+  retryCount: 100,
+  retryDelay: 200, // time in ms
+})
 
 export default async function tasksHandler() {
-  let tasksLen = await getTasksLen()
-  if (!tasksLen) {
-    console.log(`${pm2tips} All tasks were received!`)
+  await setBeginTime(redlock)
+  let curIndex = await getCurIndex()
+  // all tasks were completed
+  if (curIndex === TASK_AMOUNT) {
+    const beginTime = await getRedisValue(`${TASK_NAME}_BEGIN_TIME`)
+    const cost = new Date().getTime() - Number(beginTime)
+    console.log(`${pm2tips} All tasks were completed! Time cost: ${cost}ms.`)
     return
   }
-  if (tasksLen === TASK_AMOUNT) {
-    client.set(`${TASK_NAME}_BEGIN`, `${new Date().getTime()}`)
-  }
+
   const task = await popTask()
 
   // handle task
-  function handleTask (task: string) {
-    return new Promise(resolve => {
-      setTimeout(async () =>  {
+  function handleTask(task: string) {
+    return new Promise((resolve) => {
+      setTimeout(async () => {
         console.log(`${pm2tips} Handling task: ${task}...`)
         resolve()
       }, 2000)
@@ -27,13 +40,14 @@ export default async function tasksHandler() {
   }
 
   await handleTask(task)
-  tasksLen = await getTasksLen()
-  if (!tasksLen) {
-    const beginTime = await getBeginTime()
-    const cost = new Date().getTime() - beginTime
-    console.log(`${pm2tips} All tasks were completed! Time cost: ${cost}ms.`)
+  try {
+    const lock = await redlock.lock(`lock:${TASK_NAME}_CUR_INDEX`, 1000)
+    curIndex = await getCurIndex()
+    await setCurIndex(curIndex + 1)
+    await lock.unlock().catch((e) => e)
+  } catch (e) {
+    console.log(e)
   }
-
   // recursion
   await tasksHandler()
 }
