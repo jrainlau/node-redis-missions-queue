@@ -11,9 +11,11 @@ exports.delRedisKey = (key) => new Promise(resolve => mqClient_1.default.del(key
 exports.popTask = () => new Promise(resolve => mqClient_1.default.blpop(exports.TASK_NAME, 1000, (err, reply) => resolve(reply[1])));
 exports.getCurIndex = () => new Promise(resolve => mqClient_1.default.get(`${exports.TASK_NAME}_CUR_INDEX`, (err, reply) => resolve(Number(reply))));
 exports.setCurIndex = (index) => new Promise(resolve => mqClient_1.default.set(`${exports.TASK_NAME}_CUR_INDEX`, String(index), resolve));
+let hasRun = false;
 exports.setBeginTime = async (redlock) => {
-    if (process.env.NODE_APP_INSTANCE !== '0')
+    if (hasRun)
         return;
+    hasRun = true;
     const lock = await redlock.lock(`lock:${exports.TASK_NAME}_SET_FIRST`, 1000);
     const setFirst = await exports.getRedisValue(`${exports.TASK_NAME}_SET_FIRST`);
     if (setFirst !== 'true') {

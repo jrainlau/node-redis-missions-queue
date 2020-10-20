@@ -12,8 +12,11 @@ export const popTask = (): Promise<string> => new Promise(resolve => client.blpo
 export const getCurIndex = (): Promise<number> => new Promise(resolve => client.get(`${TASK_NAME}_CUR_INDEX`, (err, reply) => resolve(Number(reply))))
 export const setCurIndex = (index: number) => new Promise(resolve => client.set(`${TASK_NAME}_CUR_INDEX`, String(index), resolve))
 
+let hasRun = false
+
 export const setBeginTime = async (redlock: Redlock) => {
-  if (process.env.NODE_APP_INSTANCE !== '0') return
+  if (hasRun) return
+  hasRun = true
   const lock = await redlock.lock(`lock:${TASK_NAME}_SET_FIRST`, 1000)
   const setFirst = await getRedisValue(`${TASK_NAME}_SET_FIRST`)
   if (setFirst !== 'true') {
