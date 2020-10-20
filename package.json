@@ -1,0 +1,33 @@
+{
+  "name": "node-redis-missions-queue",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start:redis": "docker run -itd --name redis-local -p 6379:6379 redis",
+    "stop:redis": "docker container kill redis-local && docker container rm redis-local",
+    "createTasks": "node ./dist/createTasks.js",
+    "start:pm2": "pm2 start ./dist/index.js -i 4 --watch && pm2 logs",
+    "stop:pm2": "pm2 delete all && pm2 flush",
+    "dev": "tsc --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jrainlau/node-redis-missions-queue.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jrainlau/node-redis-missions-queue/issues"
+  },
+  "homepage": "https://github.com/jrainlau/node-redis-missions-queue#readme",
+  "dependencies": {
+    "pm2": "^4.5.0",
+    "redis": "^3.0.2",
+    "typescript": "^4.0.3"
+  },
+  "devDependencies": {
+    "@types/redis": "^2.8.28"
+  }
+}
