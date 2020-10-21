@@ -7,6 +7,7 @@ client.on('ready', async () => {
     client.lpush(TASK_NAME, `task-${i}`)
   }
 
+  await setRedisValue(`${TASK_NAME}_TOTAL`, `${TASK_AMOUNT}`)
   await setRedisValue(`${TASK_NAME}_CUR_INDEX`, '0')
   await setRedisValue(`${TASK_NAME}_SET_FIRST`, 'false')
   await delRedisKey(`${TASK_NAME}_BEGIN_TIME`)

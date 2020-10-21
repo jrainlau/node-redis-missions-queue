@@ -7,6 +7,7 @@ mqClient_1.default.on('ready', async () => {
     for (let i = utils_1.TASK_AMOUNT; i > 0; i--) {
         mqClient_1.default.lpush(utils_1.TASK_NAME, `task-${i}`);
     }
+    await utils_1.setRedisValue(`${utils_1.TASK_NAME}_TOTAL`, `${utils_1.TASK_AMOUNT}`);
     await utils_1.setRedisValue(`${utils_1.TASK_NAME}_CUR_INDEX`, '0');
     await utils_1.setRedisValue(`${utils_1.TASK_NAME}_SET_FIRST`, 'false');
     await utils_1.delRedisKey(`${utils_1.TASK_NAME}_BEGIN_TIME`);

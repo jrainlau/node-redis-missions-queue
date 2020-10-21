@@ -12,11 +12,7 @@ export const popTask = (): Promise<string> => new Promise(resolve => client.blpo
 export const getCurIndex = (): Promise<number> => new Promise(resolve => client.get(`${TASK_NAME}_CUR_INDEX`, (err, reply) => resolve(Number(reply))))
 export const setCurIndex = (index: number) => new Promise(resolve => client.set(`${TASK_NAME}_CUR_INDEX`, String(index), resolve))
 
-let hasRun = false
-
 export const setBeginTime = async (redlock: Redlock) => {
-  if (hasRun) return
-  hasRun = true
   const lock = await redlock.lock(`lock:${TASK_NAME}_SET_FIRST`, 1000)
   const setFirst = await getRedisValue(`${TASK_NAME}_SET_FIRST`)
   if (setFirst !== 'true') {
@@ -25,5 +21,20 @@ export const setBeginTime = async (redlock: Redlock) => {
     await setRedisValue(`${TASK_NAME}_BEGIN_TIME`, `${new Date().getTime()}`)
   }
   await lock.unlock().catch(e => e)
+}
+
+export const setRedisValueWithLock = async (key: string, value: string, redlock: Redlock, ttl: number =  1000) => {
+  const lock  = await redlock.lock(`lock:${key}`, ttl)
+  await setRedisValue(key, value)
+  await lock.unlock().catch(e => e)
   return
 }
+
+export const getRedisValueWithLock = async (key: string, redlock: Redlock, ttl: number =  1000) => {
+  const lock  = await redlock.lock(`lock:${key}`, ttl)
+  const value = await getRedisValue(key)
+  await lock.unlock().catch(e => e)
+  return value
+}
+
+export const sleep = (timeout: number) => new Promise(resolve =>  setTimeout(resolve, timeout))

@@ -7,15 +7,33 @@ const redlock = new Redlock([mqClient_1.default], {
     retryCount: 100,
     retryDelay: 200,
 });
+let hasSetBeginTime = false;
 async function tasksHandler() {
-    await utils_1.setBeginTime(redlock);
     let curIndex = await utils_1.getCurIndex();
+    const taskAmount = Number(await utils_1.getRedisValue(`${utils_1.TASK_NAME}_TOTAL`));
+    // waiting new tasks
+    if (taskAmount === 0) {
+        console.log(`${utils_1.pm2tips} Wating new tasks...`);
+        await utils_1.sleep(2000);
+        await tasksHandler();
+        return;
+    }
     // all tasks were completed
-    if (curIndex === utils_1.TASK_AMOUNT) {
+    if (curIndex === taskAmount) {
         const beginTime = await utils_1.getRedisValue(`${utils_1.TASK_NAME}_BEGIN_TIME`);
         const cost = new Date().getTime() - Number(beginTime);
-        console.log(`${utils_1.pm2tips} All tasks were completed! Time cost: ${cost}ms.`);
-        return;
+        console.log(`${utils_1.pm2tips} All tasks were completed! Time cost: ${cost}ms. ${beginTime}`);
+        await utils_1.setRedisValue(`${utils_1.TASK_NAME}_TOTAL`, '0');
+        await utils_1.setRedisValue(`${utils_1.TASK_NAME}_CUR_INDEX`, '0');
+        await utils_1.setRedisValue(`${utils_1.TASK_NAME}_SET_FIRST`, 'false');
+        await utils_1.delRedisKey(`${utils_1.TASK_NAME}_BEGIN_TIME`);
+        hasSetBeginTime = false;
+        await utils_1.sleep(2000);
+        await tasksHandler();
+    }
+    if (!hasSetBeginTime) {
+        await utils_1.setBeginTime(redlock);
+        hasSetBeginTime = true;
     }
     const task = await utils_1.popTask();
     // handle task
