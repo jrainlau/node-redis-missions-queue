@@ -13,7 +13,7 @@ export const getCurIndex = (): Promise<number> => new Promise(resolve => client.
 export const setCurIndex = (index: number) => new Promise(resolve => client.set(`${TASK_NAME}_CUR_INDEX`, String(index), resolve))
 
 export const setBeginTime = async (redlock: Redlock) => {
-  const lock = await redlock.lock(`lock:${TASK_NAME}_SET_FIRST`, 1000)
+  const lock = await redlock.lock(`locks:${TASK_NAME}_SET_FIRST`, 1000)
   const setFirst = await getRedisValue(`${TASK_NAME}_SET_FIRST`)
   if (setFirst !== 'true') {
     console.log(`${pm2tips} Get the first task!`)
@@ -24,14 +24,14 @@ export const setBeginTime = async (redlock: Redlock) => {
 }
 
 export const setRedisValueWithLock = async (key: string, value: string, redlock: Redlock, ttl: number =  1000) => {
-  const lock  = await redlock.lock(`lock:${key}`, ttl)
+  const lock  = await redlock.lock(`locks:${key}`, ttl)
   await setRedisValue(key, value)
   await lock.unlock().catch(e => e)
   return
 }
 
 export const getRedisValueWithLock = async (key: string, redlock: Redlock, ttl: number =  1000) => {
-  const lock  = await redlock.lock(`lock:${key}`, ttl)
+  const lock  = await redlock.lock(`locks:${key}`, ttl)
   const value = await getRedisValue(key)
   await lock.unlock().catch(e => e)
   return value

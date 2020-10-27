@@ -12,7 +12,7 @@ exports.popTask = () => new Promise(resolve => mqClient_1.default.blpop(exports.
 exports.getCurIndex = () => new Promise(resolve => mqClient_1.default.get(`${exports.TASK_NAME}_CUR_INDEX`, (err, reply) => resolve(Number(reply))));
 exports.setCurIndex = (index) => new Promise(resolve => mqClient_1.default.set(`${exports.TASK_NAME}_CUR_INDEX`, String(index), resolve));
 exports.setBeginTime = async (redlock) => {
-    const lock = await redlock.lock(`lock:${exports.TASK_NAME}_SET_FIRST`, 1000);
+    const lock = await redlock.lock(`locks:${exports.TASK_NAME}_SET_FIRST`, 1000);
     const setFirst = await exports.getRedisValue(`${exports.TASK_NAME}_SET_FIRST`);
     if (setFirst !== 'true') {
         console.log(`${exports.pm2tips} Get the first task!`);
@@ -22,13 +22,13 @@ exports.setBeginTime = async (redlock) => {
     await lock.unlock().catch(e => e);
 };
 exports.setRedisValueWithLock = async (key, value, redlock, ttl = 1000) => {
-    const lock = await redlock.lock(`lock:${key}`, ttl);
+    const lock = await redlock.lock(`locks:${key}`, ttl);
     await exports.setRedisValue(key, value);
     await lock.unlock().catch(e => e);
     return;
 };
 exports.getRedisValueWithLock = async (key, redlock, ttl = 1000) => {
-    const lock = await redlock.lock(`lock:${key}`, ttl);
+    const lock = await redlock.lock(`locks:${key}`, ttl);
     const value = await exports.getRedisValue(key);
     await lock.unlock().catch(e => e);
     return value;

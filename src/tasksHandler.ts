@@ -18,8 +18,6 @@ const redlock = new Redlock([client], {
   retryDelay: 200, // time in ms
 })
 
-let hasSetBeginTime  = false
-
 export default async function tasksHandler() {
   let curIndex = await getCurIndex()
   const taskAmount = Number(await getRedisValue(`${TASK_NAME}_TOTAL`))
@@ -41,15 +39,12 @@ export default async function tasksHandler() {
     await setRedisValue(`${TASK_NAME}_CUR_INDEX`, '0')
     await setRedisValue(`${TASK_NAME}_SET_FIRST`, 'false')
     await delRedisKey(`${TASK_NAME}_BEGIN_TIME`)
-    hasSetBeginTime = false
     await sleep(2000)
     await tasksHandler()
+    return
   }
 
-  if (!hasSetBeginTime) {
-    await setBeginTime(redlock)
-    hasSetBeginTime = true
-  }
+  await setBeginTime(redlock)
 
   const task = await popTask()
 
@@ -65,7 +60,7 @@ export default async function tasksHandler() {
 
   await handleTask(task)
   try {
-    const lock = await redlock.lock(`lock:${TASK_NAME}_CUR_INDEX`, 1000)
+    const lock = await redlock.lock(`locks:${TASK_NAME}_CUR_INDEX`, 1000)
     curIndex = await getCurIndex()
     await setCurIndex(curIndex + 1)
     await lock.unlock().catch((e) => e)

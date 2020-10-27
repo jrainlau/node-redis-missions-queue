@@ -7,7 +7,6 @@ const redlock = new Redlock([mqClient_1.default], {
     retryCount: 100,
     retryDelay: 200,
 });
-let hasSetBeginTime = false;
 async function tasksHandler() {
     let curIndex = await utils_1.getCurIndex();
     const taskAmount = Number(await utils_1.getRedisValue(`${utils_1.TASK_NAME}_TOTAL`));
@@ -27,14 +26,11 @@ async function tasksHandler() {
         await utils_1.setRedisValue(`${utils_1.TASK_NAME}_CUR_INDEX`, '0');
         await utils_1.setRedisValue(`${utils_1.TASK_NAME}_SET_FIRST`, 'false');
         await utils_1.delRedisKey(`${utils_1.TASK_NAME}_BEGIN_TIME`);
-        hasSetBeginTime = false;
         await utils_1.sleep(2000);
         await tasksHandler();
+        return;
     }
-    if (!hasSetBeginTime) {
-        await utils_1.setBeginTime(redlock);
-        hasSetBeginTime = true;
-    }
+    await utils_1.setBeginTime(redlock);
     const task = await utils_1.popTask();
     // handle task
     function handleTask(task) {
@@ -47,7 +43,7 @@ async function tasksHandler() {
     }
     await handleTask(task);
     try {
-        const lock = await redlock.lock(`lock:${utils_1.TASK_NAME}_CUR_INDEX`, 1000);
+        const lock = await redlock.lock(`locks:${utils_1.TASK_NAME}_CUR_INDEX`, 1000);
         curIndex = await utils_1.getCurIndex();
         await utils_1.setCurIndex(curIndex + 1);
         await lock.unlock().catch((e) => e);
